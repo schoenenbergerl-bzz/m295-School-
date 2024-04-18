@@ -1,12 +1,13 @@
 const express = require('express')
 const app = express()
 const swaggerUi = require('swagger-ui-express')
-const swaggerDocument = require('./swagger-output.json')
+const swaggerDocument = require('./a6.2/swagger-output.json')
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-let books = [
+// Sample book data
+const books = [
   { isbn: '978-3-16-148410-0', title: 'Example Book', year: 2021, author: 'John Doe' },
   { isbn: '978-0-596-52068-7', title: 'Learning JavaScript Design Patterns', year: 2012, author: 'Addy Osmani' },
   { isbn: '978-0-201-63361-0', title: 'Design Patterns: Elements of Reusable Object-Oriented Software', year: 1994, author: 'Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides' },
@@ -19,15 +20,22 @@ let books = [
   { isbn: '978-1-593-27111-4', title: 'Programming Python', year: 2010, author: 'Mark Lutz' }
 ]
 
+// Retrieve all books
 app.get('/books', (req, res) => {
-  res.json(books)
+  res.status(200).json(books)
 })
 
+// Retrieve a book by ISBN
 app.get('/books/:isbn', (req, res) => {
   const book = books.find(b => b.isbn === req.params.isbn)
-  res.json(book)
+  if (book) {
+    res.status(200).json(book)
+  } else {
+    res.status(404).send('Book not found')
+  }
 })
 
+// Add a new book
 app.post('/books', (req, res) => {
   const { isbn, title, year, author } = req.body
   if (!isbn || !title || !year || !author) {
@@ -35,87 +43,51 @@ app.post('/books', (req, res) => {
   }
   const exists = books.some(b => b.isbn === isbn)
   if (exists) {
-    return res.send('Book already exists')
+    return res.status(409).send('Book already exists')
   }
   const book = { isbn, title, year, author }
   books.push(book)
-  res.json(book)
+  res.status(201).json(book)
 })
 
-/*
-app.put('/books/:isbn', (req, res) => {
-    const book = books.find(b => b.isbn === req.params.isbn);
-    const {title, year, author} = req.body;
-    if (book) {
-        if (!title || !year || !author) {
-            return res.send('Input all fields (title, year, author');
-        }
-        book.title = title;
-        book.year = year;
-        book.author = author;
-        res.json(book);
-    } else {
-        res.send('Book does not exist')
-    }
-})
-*/
-
+// Update a book
 app.put('/books/:isbn', (req, res) => {
   const { title, year, author } = req.body
   if (!title || !year || !author) {
-    return res.send('All fields are required')
+    return res.status(400).send('All fields are required')
   }
-  let updatedBook = null
-  books = books.map(book => {
-    if (book.isbn === req.params.isbn) {
-      updatedBook = { ...book, title, year, author }
-      return updatedBook
-    }
-    return book
-  })
-
-  if (!updatedBook) {
-    return res.send('Book not found')
+  const index = books.findIndex(book => book.isbn === req.params.isbn)
+  if (index === -1) {
+    return res.status(404).send('Book not found')
   }
-  res.json(updatedBook)
+  books[index] = { ...books[index], title, year, author }
+  res.status(200).json(books[index])
 })
 
-/*
+// Delete a book
 app.delete('/books/:isbn', (req, res) => {
-    const index = books.findIndex(b => b.isbn === req.params.isbn);
-    if (index !== -1) {
-        books.splice(index, 1)
-        res.send('Book removed')
-    } else {
-        res. send('Book not found')
-    }
-})
-*/
-
-app.delete('/books/:isbn', (req, res) => {
-  const initialLength = books.length
-  books = books.filter(book => book.isbn !== req.params.isbn)
-  if (books.length === initialLength) {
-    return res.send('Book not found')
+  const index = books.findIndex(book => book.isbn === req.params.isbn)
+  if (index === -1) {
+    return res.status(404).send('Book not found')
   }
-  res.send()
+  books.splice(index, 1)
+  res.status(204).send()
 })
 
+// Patch a book
 app.patch('/books/:isbn', (req, res) => {
   const book = books.find(b => b.isbn === req.params.isbn)
-  const { title, year, author } = req.body
-  if (book) {
-    if (title) book.title = title
-    if (year) book.year = year
-    if (author) book.author = author
-    res.json(book)
-  } else {
-    res.send('Book does not exist')
+  if (!book) {
+    return res.status(404).send('Book does not exist')
   }
+  const { title, year, author } = req.body
+  if (title) book.title = title
+  if (year) book.year = year
+  if (author) book.author = author
+  res.status(200).json(book)
 })
 
-/* a5.2 ab hier */
-
+// Lending operations start here
 const lends = [
   {
     id: 1,
@@ -154,62 +126,49 @@ const lends = [
   }
 ]
 
-app.get('/lends', (res, req) => {
-  res.json(lends)
+// Retrieve all lends
+app.get('/lends', (req, res) => {
+  res.status(200).json(lends)
 })
 
+// Retrieve a lend by ID
 app.get('/lends/:id', (req, res) => {
   const lend = lends.find(l => l.id === parseInt(req.params.id))
   if (lend) {
-    res.json(lend)
+    res.status(200).json(lend)
   } else {
-    res.send('Lend not found')
+    res.status(404).send('Lend not found')
   }
 })
 
+// Create a new lend
 app.post('/lends', (req, res) => {
-  const { id, customer_id, isbn, borrowed_at, returned_at } = req.body
-  if (!id || !customer_id || !isbn || !borrowed_at) {
-    return res.status(422).send('Input all fields (returned_at is optional)')
-  }
-  const activeLends = lends.filter(l => l.customer_id === customer_id && l.returned_at === null)
-  if (activeLends.length >= 3) {
-    return res.status(409).send('Customer has already three active lends')
+  const { customer_id, isbn, borrowed_at } = req.body
+  if (!customer_id || !isbn || !borrowed_at) {
+    return res.status(400).send('Input all fields (returned_at is optional)')
   }
   const bookLent = lends.some(l => l.isbn === isbn && l.returned_at === null)
   if (bookLent) {
     return res.status(409).send('Book already lent')
   }
-  const newLend = {
-    id: lends.length + 1,
-    customer_id,
-    isbn,
-    borrowed_at: new Date().toISOString(),
-    returned_at: null
-  }
+  const newLend = { id: lends.length + 1, customer_id, isbn, borrowed_at, returned_at: null }
   lends.push(newLend)
-  res.json(newLend)
+  res.status(201).json(newLend)
 })
 
+// Return a lend
 app.delete('/lends/:id', (req, res) => {
-  const lendIndex = lends.findIndex(l => l.id === parseInt(req.params.id) && l.returned_at === null)
-  if (lendIndex !== -1) {
-    lends[lendIndex].returned_at = new Date().toISOString()
-    res.send(lends[lendIndex])
-  } else {
-    res.send('Lend does not exist or already returned')
+  const index = lends.findIndex(l => l.id === parseInt(req.params.id) && l.returned_at === null)
+  if (index === -1) {
+    return res.status(404).send('Lend does not exist or already returned')
   }
+  lends[index].returned_at = new Date().toISOString()
+  res.status(200).json(lends[index])
 })
-
-/* dies war einfach für mich
-app.get('/now', (request, response) => {
-    response.send(new Date().toLocaleTimeString("de-CH", {timeZone: request.query.tz}));
-});
-*/
 
 app.use('/swagger-ui', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
 const port = 3000
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
+  console.log(`Server listening on port ${port}`)
 })
